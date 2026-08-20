@@ -1,69 +1,60 @@
-# Welcome to My GitHub Profile 👋  
+# DRIFA-Net Adaptation — Brain Tumor MRI + HAM10000
 
-## Multimodal Fusion Learning with Dual Attention for Medical Imaging
+This repository adapts **DRIFA-Net** (Dhar et al., WACV 2025 — *"Multimodal Fusion Learning with Dual Attention for Medical Imaging"*, [arXiv:2412.01248](https://arxiv.org/abs/2412.01248)) to a two-dataset dual-branch classification setup: **Brain Tumor MRI** (4 classes) + **HAM10000** skin lesion images (7 classes), trained locally on an NVIDIA T1000.
 
-Multimodal fusion learning has shown significant promise in classifying various diseases such as skin cancer and brain tumors. However, existing methods face three key limitations:  
+This is an **adaptation, not a reproduction** of the original paper's protocol — the original work spans five datasets across multiple modality pairs; this project narrows scope to two datasets that were obtainable, replacing the original SIPaKMeD branch with Brain Tumor MRI. See `DRIFA_Project_Current_Status_and_Implementation_Guide.md` for the full rationale and change log.
 
-1. **Lack of Generalizability**: Existing methods often fail to generalize across diagnosis tasks due to their focus on a specific disease.  
-2. **Limited Use of Diverse Modalities**: They do not fully leverage multiple health records from diverse modalities to learn robust complementary information.  
-3. **Single Attention Mechanism**: Relying on a single attention mechanism misses the benefits of combining multiple attention strategies within and across various modalities.  
+## What's in this repo
 
-### Our Proposed Approach: **DRIFA**  
+| File | What it is |
+|---|---|
+| `Code_v2.ipynb` | Main adapted pipeline: dataset loading, preprocessing/augmentation, model build, training, evaluation |
+| `AFG_Value_Addition.ipynb` | Adaptive Fusion Gate experiment — an architecture-level addition tested on top of the baseline (see Results below) |
+| `DRIFA_Project_Current_Status_and_Implementation_Guide.md` | Full engineering log: dataset substitution, architecture review, training config, hardware notes, decisions and their reasoning |
+| `doc_for_report_creation.pdf` / `.html` | Researcher-facing reference document — citation, methodology, results at each stage, honest limitations |
+| `requirements.txt` | Python dependencies |
 
-To address these challenges, we propose:  
-**A Dual Robust Information Fusion Attention Mechanism** (**DRIFA**)  
+**Model weights are not included** — the trained checkpoints are 200MB-650MB each, well past what's practical to version in git. Results below are the actual measured numbers from local runs; the notebooks show the executed outputs (training logs, printed metrics) directly.
 
-### Key Features of DRIFA:  
+## Datasets
 
-- **Multi-Branch Fusion Attention Module**: Enhances representations for each modality, such as dermoscopy, pap smear, MRI, and CT scans.  
-- **Multimodal Information Fusion Attention Module**: Learns refined multimodal shared representations, improving the network's generalization across multiple tasks.  
+| Branch | Dataset | Classes | Split |
+|---|---|---|---|
+| Input 1 | Brain Tumor MRI | glioma, meningioma, notumor, pituitary | 5,600 train (→10,373 after augmentation) / 1,600 test |
+| Input 2 | HAM10000 | akiec, bcc, bkl, df, mel, nv, vasc | 8,012 train / 2,003 test |
 
-DRIFA can be integrated with any deep neural network, forming a multimodal fusion learning framework known as **DRIFA-Net**.  
+HAM10000 is severely imbalanced — `nv` is 67% of the data, `df` is 1.15% (a 58:1 ratio) — which turned out to be the central problem this project ended up diagnosing and addressing (see below).
 
-### Performance Highlights:  
+## Architecture
 
-- **Uncertainty Estimation**: Using an ensemble Monte Carlo dropout strategy, DRIFA-Net provides reliable predictions with uncertainty estimates.  
-- **State-of-the-Art Results**: Extensive experiments on five publicly available datasets demonstrate consistent performance improvements over existing methods.  
+Retained from the original repository: **MFA** (multi-branch fusion attention), **MIFA** (multimodal information fusion attention, applied 8 times throughout the dual-branch backbone), and **RGSA** residual attention blocks. Only the final classifier heads were changed (`Dense(5)` → `Dense(4)` for the new Brain MRI branch; HAM10000's `Dense(7)` unchanged). Full architecture data-flow and parameter counts are documented in the status guide.
 
-### Technologies and Applications:  
-- **Applications**: Disease classification (e.g., skin cancer, brain tumors).  
-- **Modalities**: Dermoscopy, pap smear, MRI, and CT scans.  
+## Results
 
+**Baseline** (trained backbone, unchanged `loss_weights=[0.5,0.5]`, no class weighting):
 
-![image](https://github.com/user-attachments/assets/183e6cfa-c351-4fac-a2ee-5058c5a3a883)
-Figure 1. Detailed architecture of DRIFA-Net. Key components include: (A) the target-specific multimodal fusion learning (TMFL)
-phase, followed by (B) an uncertainty quantification (UQ) phase. TMFL phase comprises a robust residual attention (RRA) block, shown
-in (C), and utilizes multi-branch fusion attention (MFA), an additional MFA module for further refinement of local representations, a
-multimodal information fusion attention (MIFA) module for improved multimodal representation learning, and multitask learning (MTL)
-for handling multiple classification tasks. During (UQ) phase, the reliability of DRIFA-Net predictions are assessed.
+| Branch | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) |
+|---|---|---|---|---|
+| Brain MRI (4-class) | 92.4% | 92.7% | 92.4% | 92.2% |
+| HAM10000 (7-class) | 77.7% | 55.9% | 51.4% | 53.2% |
 
+HAM10000's gap between accuracy and macro recall/F1 traces directly to the class imbalance above — the model was defaulting toward the majority class rather than learning rare classes well.
 
-![image](https://github.com/user-attachments/assets/5bb28a78-1f8a-4036-9ed0-0a43e1c854f9)
+**Class-balanced training** (`sklearn` balanced class weights applied to the HAM10000 loss, sqrt-dampened and combined with a lower fine-tuning learning rate for training stability): in progress — this document will be updated with final numbers once the run completes.
 
-Figure 2. (a) Multi-branch fusion attention (MFA) module.Key components include hierarchical information fusion attention (HIFA) for diverse 
-local information enhancement and channelwise local information attention (CLIA) for improved channelspecific representation learning.
+**Adaptive Fusion Gate (AFG)**: an architecture-level addition inserted at the one point in the network with no learned weighting today — the final feature concatenation immediately before the classification heads — designed to let the model learn a per-sample, competitive weighting between the two branches, with a zero-initialization guarantee that the model starts mathematically identical to baseline. Tested over a short training run; results did not show an improvement over baseline on either branch. Documented honestly as a negative result — see `doc_for_report_creation.pdf` for the full design, the safety argument, and analysis of why it may not have helped (most likely: too few epochs for the newly-added parameters to specialize, and the two branches being index-paired rather than genuinely paired samples, limiting how much real "branch trust" signal exists to learn from).
 
+## Setup
 
-![image](https://github.com/user-attachments/assets/89a9e27f-dcb2-4c4a-8533-d0e5a7852cda)
+```
+pip install -r requirements.txt
+```
+Trained and evaluated locally on an NVIDIA T1000 via the `tensorflow-directml` plugin (TensorFlow 2.10.1).
 
-Figure 3. (a) Multimodal information fusion attention (MIFA) module. This module includes multimodal global information fusion attention (MGIFA) (shown in b) and multimodal local information fusion attention (MLIFA) (shown in c).
+## Original Paper
 
+**DRIFA** (Dual Robust Information Fusion Attention) proposes a multi-branch fusion attention module and a multimodal information fusion attention module, combined with Monte Carlo Dropout for uncertainty estimation, evaluated across five publicly available datasets spanning dermoscopy, pap smear, MRI, and CT-scan modalities.
 
-![image](https://github.com/user-attachments/assets/6fb43d09-7df3-47af-919d-9c3cfc03ca24)
-
-Figure 4. Visual representation of the important regions highlighted by our proposed DRIFA-Net and four SOTA methods using the
-GRAD-CAM technique on two benchmark datasets D1 and D3. (a) and (g) display the original images, while (b) and (h) present results for
-Gloria, (c) and (i) for MTF with MA, (d) and (j) for CAF, (e) and (k) for MTTU-Net, and (f) and (l) for our proposed DRIFA-Net.
-
-
-![image](https://github.com/user-attachments/assets/45530e92-f739-420c-bdea-85996dbf9712)
-
-Figure 5. T-SNE visualization of different models applied to the dermoscopy images of the D1 dataset, where (a) represents the T-SNE visualization of Gloria, (b) of MTTU-Net, and (c) of our proposed DRIFA-Net.
-
-
-### Citation:  
-
-If you find this work useful, please cite:  
 ```bibtex
 @inproceedings{dhar2025multimodal,
   title={Multimodal Fusion Learning with Dual Attention for Medical Imaging},
@@ -72,10 +63,8 @@ If you find this work useful, please cite:
   year={2025},
   url={https://arxiv.org/abs/2412.01248}
 }
+```
 
+![image](https://github.com/user-attachments/assets/183e6cfa-c351-4fac-a2ee-5058c5a3a883)
 
-
-
-
-
-
+*Figure: DRIFA-Net architecture from the original paper — (A) target-specific multimodal fusion learning phase using MFA/MIFA/RGSA, (B) uncertainty quantification phase.*
