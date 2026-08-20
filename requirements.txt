@@ -1,0 +1,11 @@
+tensorflow-cpu==2.10.1
+tensorflow-directml-plugin
+numpy==1.23.5
+opencv-python==4.7.0.72
+pandas==1.5.3
+scipy==1.10.1
+scikit-learn==1.2.2
+matplotlib==3.7.1
+seaborn==0.12.2
+plotly
+ipykernel

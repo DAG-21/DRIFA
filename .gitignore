@@ -1,0 +1,9 @@
+.venv/
+Dataset/
+*.keras
+execution_log.txt.out
+execution_log.txt.err
+afg_execution_log.txt.out
+afg_execution_log.txt.err
+__pycache__/
+.ipynb_checkpoints/

@@ -1,0 +1,305 @@
+<html>
+<head>
+<style>
+body { font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #1a1a1a; line-height: 1.45; }
+h1 { font-size: 20pt; margin-bottom: 2px; }
+h2 { font-size: 14pt; margin-top: 22px; border-bottom: 1px solid #999; padding-bottom: 2px; }
+h3 { font-size: 11.5pt; margin-top: 14px; margin-bottom: 4px; }
+.subtitle { font-size: 11pt; color: #555; margin-bottom: 14px; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 12px 0; }
+th, td { border: 1px solid #999; padding: 4px 7px; font-size: 9.5pt; text-align: left; }
+th { background-color: #e8e8e8; }
+code, pre { font-family: Courier, monospace; font-size: 9pt; }
+pre { background-color: #f2f2f2; padding: 6px 8px; border: 1px solid #ccc; white-space: pre-wrap; }
+.tag { font-weight: bold; padding: 1px 5px; border-radius: 2px; font-size: 8.5pt; }
+.done { background-color: #d9ead3; }
+.progress { background-color: #fff2cc; }
+.pending { background-color: #f4cccc; }
+.note { background-color: #eef; border-left: 3px solid #667; padding: 5px 8px; margin: 6px 0; font-size: 9.5pt; }
+.pagebreak { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<h1>DRIFA-Net Adaptation — Source Material for Research Report</h1>
+<div class="subtitle">Internal reference document. Compiled for report drafting — not itself the report. Every figure below is either directly measured from this project's own runs, or explicitly marked as unverified/pending/estimated. Do not present estimated figures as measured results in the final report.</div>
+
+<h2>1. Original Work Being Adapted</h2>
+<table>
+<tr><th>Item</th><th>Detail</th></tr>
+<tr><td>Paper</td><td>"Multimodal Fusion Learning with Dual Attention for Medical Imaging" — arXiv:2412.01248</td></tr>
+<tr><td>Authors</td><td>Joy Dhar, Nayyar Zaidi, Maryam Haghighat, Puneet Goyal, Sudipta Roy, Azadeh Alavi, Vikas Kumar</td></tr>
+<tr><td>Proposed method</td><td>DRIFA — Dual Robust Information Fusion Attention. Two attention modules: a multi-branch fusion attention module (MFA) and a multimodal information fusion attention module (MIFA), plus Monte Carlo Dropout for uncertainty estimation.</td></tr>
+<tr><td>Original experimental scope (per abstract)</td><td>Five publicly available datasets across diverse modalities (dermoscopy, pap smear, MRI, CT-scan are named as modality types in the abstract; exact dataset identities and per-dataset metrics are <b>not</b> stated in the abstract and were not independently verified in this session — pull exact table values directly from the paper's PDF/results tables for the report, do not cite figures from this document as the paper's own results).</td></tr>
+<tr><td>Reference code repository</td><td>Referenced in project materials as <code>github.com/misti1203/DRIFA-Net</code> — this is this project's own working repository (see §7), not confirmed to be the original authors' repository. Verify and cite the authors' own repository link from the paper itself for the report.</td></tr>
+</table>
+<div class="note">This project does <b>not</b> reproduce the original paper's experimental protocol. It adapts the architecture to a different, smaller pair of datasets. Frame this explicitly as an adaptation in the report, not a reproduction — see §11.</div>
+
+<h2>2. Why the Datasets Were Substituted</h2>
+<p>The notebook being adapted (<code>Code.ipynb</code>) originally expected preprocessed NumPy arrays for one of its dataset branches (<code>X_train_HAM10000_ISIC_2018.npy</code>, etc.) that were not available in this environment, and its second dataset was <b>SIPaKMeD</b> (cervical cytology), which was also unavailable. Rather than reproduce the original five-dataset, multi-modality experimental protocol, the project scope was narrowed to two datasets that were obtainable and represent a genuine dual-modality classification problem: <b>HAM10000</b> (kept, but loaded from raw images + metadata instead of missing <code>.npy</code> files) and <b>Brain Tumor MRI</b> (substituted for SIPaKMeD).</p>
+
+<h2>3. Adapted Datasets</h2>
+<h3>3.1 Brain Tumor MRI (branch/input 1)</h3>
+<table>
+<tr><th>Property</th><th>Value</th></tr>
+<tr><td>Classes (4)</td><td>glioma=0, meningioma=1, notumor=2, pituitary=3</td></tr>
+<tr><td>Source structure</td><td><code>Dataset/brain tumor/Training/{class}</code> and <code>Testing/{class}</code> folders, used directly (no extra train/test split needed)</td></tr>
+<tr><td>Raw verified shapes</td><td>X_train=(5600,128,128,3), y_train=(5600,4), X_test=(1600,128,128,3), y_test=(1600,4)</td></tr>
+<tr><td>Preprocessing</td><td>Resize to 128x128 RGB, normalize /255</td></tr>
+<tr><td>Augmentation</td><td>+20&deg; rotation and (5,5) pixel translation applied to each of the 5,600 training images (11,200 possible augmented samples); 4,773 of these were selected and concatenated with the 5,600 originals &rarr; <b>10,373</b> Brain MRI training samples</td></tr>
+<tr><td>Test-set duplication note</td><td>A separate copy of the test set was tripled and reduced to 2,003 samples specifically to index-align with HAM10000's 2,003-sample test set for one of the two evaluation passes used in this notebook (see §9). The original, non-duplicated 1,600-sample test set is also retained and used in the other evaluation pass.</td></tr>
+</table>
+
+<h3>3.2 HAM10000 (branch/input 2)</h3>
+<table>
+<tr><th>Property</th><th>Value</th></tr>
+<tr><td>Classes (7)</td><td>akiec=0, bcc=1, bkl=2, df=3, mel=4, nv=5, vasc=6</td></tr>
+<tr><td>Source</td><td><code>HAM10000_metadata.csv</code> + JPGs across two image-part directories</td></tr>
+<tr><td>Split</td><td>80/20 stratified split by class (<code>train_test_split</code>, <code>random_state=42</code>)</td></tr>
+<tr><td>Verified shapes</td><td>X_train=(8012,128,128,3), y_train=(8012,7), X_test=(2003,128,128,3), y_test=(2003,7)</td></tr>
+<tr><td>Preprocessing</td><td>Resize to 128x128 RGB, normalize /255. No augmentation applied to this branch.</td></tr>
+</table>
+
+<h3>3.3 HAM10000 class distribution — measured directly from <code>HAM10000_metadata.csv</code></h3>
+<table>
+<tr><th>Class</th><th>Count</th><th>% of full dataset</th></tr>
+<tr><td>nv</td><td>6,705</td><td>66.95%</td></tr>
+<tr><td>mel</td><td>1,113</td><td>11.11%</td></tr>
+<tr><td>bkl</td><td>1,099</td><td>10.97%</td></tr>
+<tr><td>bcc</td><td>514</td><td>5.13%</td></tr>
+<tr><td>akiec</td><td>327</td><td>3.27%</td></tr>
+<tr><td>vasc</td><td>142</td><td>1.42%</td></tr>
+<tr><td>df</td><td>115</td><td>1.15%</td></tr>
+</table>
+<p>Largest:smallest class ratio (nv:df) = <b>58:1</b>. This severe imbalance is the central diagnosed problem addressed by the optimization in §10.</p>
+
+<h3>3.4 Sample-count alignment (multi-input training constraint)</h3>
+<p>Keras multi-input models require every input/output pair in a single <code>.fit()</code> call to share the same sample count along the batch axis. After augmentation, Brain MRI (10,373) and HAM10000 (8,012) training sets had different lengths. Alignment: Brain MRI training data is shuffled and truncated to HAM10000's length (8,012), producing two length-matched training sets without permanently discarding the augmented pool (truncation, not re-augmentation, so this can be re-run with a different random shuffle). This alignment step, and the memory-duplication risk associated with earlier versions of it, is discussed further in §6.</p>
+
+<div class="pagebreak"></div>
+<h2>4. Model Architecture</h2>
+<p>The architecture is retained largely unchanged from the original repository. Component-by-component:</p>
+<table>
+<tr><th>Module</th><th>Status</th><th>Role</th></tr>
+<tr><td>MFA (<code>DeeperAttentionLayer1</code> / <code>DeeperGlobalLocalAttentionLayer1</code>)</td><td>Unchanged</td><td>Per-branch attention combining Hierarchical Information Fusion Attention (global avg/max-pooled, multi-stage) and Channel-wise Local Information Attention (CLIA), fused via a learned global/local scale and sigmoid gate. Applied independently within each branch.</td></tr>
+<tr><td>MIFA (<code>DeeperAttentionLayer</code> / <code>DeeperGlobalLocalAttentionLayer</code>)</td><td>Unchanged</td><td>Cross-branch fusion attention. Computes Multimodal Global Information Fusion Attention (MGIFA: joint min/avg/max pooling across <b>both</b> branches) and Multimodal Local Information Fusion Attention (MLIFA), producing one shared sigmoid attention map applied to <i>both</i> branches, each scaled by its own learned <code>alpha1</code>/<code>alpha2</code> parameter.</td></tr>
+<tr><td>RGSA</td><td>Unchanged</td><td>Residual block: Conv2D &rarr; MFA &rarr; BatchNorm &rarr; ReLU &rarr; Conv2D &rarr; MFA &rarr; BatchNorm &rarr; residual add &rarr; ReLU. Used repeatedly at each channel-width stage.</td></tr>
+<tr><td><code>residual_GLC_branch1</code></td><td>Unchanged</td><td>Full dual-branch backbone (see §4.1)</td></tr>
+<tr><td>Classifier heads</td><td>Modified</td><td>Original: Dense(5, softmax) + Dense(7, softmax). Adapted: <b>Dense(4, softmax)</b> for Brain MRI + Dense(7, softmax) for HAM10000 (unchanged class count).</td></tr>
+</table>
+
+<h3>4.1 Verified data flow (read directly from the model-build code, not the paper's schematic)</h3>
+<p><b>Important correction to an early assumption in this project's planning</b>: MIFA is not applied once after two independent MFA-only branches. It is interleaved with RGSA <b>eight times</b> throughout the backbone, once after each channel-width stage:</p>
+<pre>Input1 (Brain MRI, 128x128x3)        Input2 (HAM10000, 128x128x3)
+  -> Conv2D(64,7x7,s2) -> MFA -> BN -> ReLU -> MaxPool     (mirrored on input2)
+  -> RGSA(64)  -> Dropout(MCD) -> MFA   |   RGSA(64)  -> Dropout(MCD) -> MFA
+  -> MIFA #1 (fuses both branches, 64ch)
+  -> RGSA(64)  -> Dropout(MCD) -> MFA   |   RGSA(64)  -> Dropout(MCD) -> MFA
+  -> MIFA #2 (64ch)
+  -> RGSA(128, stride2) -> Dropout -> MFA | RGSA(128, stride2) -> Dropout -> MFA
+  -> MIFA #3 (128ch)
+  -> RGSA(128) -> Dropout -> MFA        | RGSA(128) -> Dropout -> MFA
+  -> MIFA #4 (128ch)
+  -> RGSA(256, stride2) -> Dropout -> MFA | RGSA(256, stride2) -> Dropout -> MFA
+  -> MIFA #5 (256ch)
+  -> RGSA(256) -> Dropout -> MFA        | RGSA(256) -> Dropout -> MFA
+  -> MIFA #6 (256ch)
+  -> RGSA(512, stride2) -> MFA          | RGSA(512, stride2) -> MFA
+  -> MIFA #7 (512ch)
+  -> RGSA(512)                          | RGSA(512)
+  -> MIFA #8 (512ch)  ->  returns x1 (None,4,4,512), x2 (None,4,4,512)
+
+Concatenate([x1, x2], axis=-1)   ->  (None, 4, 4, 1024)   *** no attention/weighting applied here today ***
+  -> Dropout(0.25, training=True)   [Monte Carlo Dropout, retained from original repo]
+  -> GlobalAveragePooling2D()       ->  shared vector (None, 1024)
+  -> Dense(4, softmax)  "BrainMRI_output"
+  -> Dense(7, softmax)  "HAM10000_output"</pre>
+<p>Two facts follow directly from this that matter for §12 (the value-addition design):</p>
+<ul>
+<li>MIFA's <code>alpha1</code>/<code>alpha2</code> scale parameters are declared as <code>shape=(1,1,1,C)</code> — <b>global</b> learned weights, identical for every sample, not sample-adaptive, despite MIFA's attention map itself being input-dependent.</li>
+<li>The final <code>Concatenate([x1, x2])</code> — the single point that actually feeds both classification heads — applies <b>no attention or learned weighting whatsoever</b>. Both branches enter at full, fixed, equal weight. This is the one true "naive fusion" point in the whole network.</li>
+</ul>
+
+<h3>4.2 Model size</h3>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Total parameters</td><td>53,883,843</td></tr>
+<tr><td>Trainable parameters</td><td>53,864,643</td></tr>
+<tr><td>Non-trainable parameters</td><td>19,200</td></tr>
+<tr><td>Input resolution</td><td>128 x 128 x 3, both branches</td></tr>
+<tr><td>Shared fused representation</td><td>(None, 1024)</td></tr>
+</table>
+
+<div class="pagebreak"></div>
+<h2>5. Training Configuration</h2>
+<table>
+<tr><th>Setting</th><th>Value</th></tr>
+<tr><td>Optimizer</td><td>Adam, learning_rate=0.001</td></tr>
+<tr><td>Loss (both heads)</td><td>categorical_crossentropy</td></tr>
+<tr><td>Loss weights</td><td>[0.5, 0.5] (<code>initial_gamma=0.5</code>) — fixed, equal, in the baseline</td></tr>
+<tr><td>Callbacks</td><td>ModelCheckpoint(monitor='val_loss', save_best_only=True) &rarr; <code>best_DRIFA_brain_HAM.keras</code>; EarlyStopping(patience=100); ReduceLROnPlateau(factor=0.2, patience=5, min_lr=1e-5)</td></tr>
+<tr><td>Intended epochs</td><td>200 (capped by EarlyStopping patience=100)</td></tr>
+<tr><td>Validation</td><td>validation_split=0.2 (drawn from the aligned 8,012-sample training set)</td></tr>
+<tr><td>Precision policy</td><td><code>mixed_float16</code> global policy enabled</td></tr>
+<tr><td>Batch size</td><td>32 (Keras default; not explicitly set) &rarr; 201 steps/epoch on the aligned training set</td></tr>
+</table>
+
+<h3>5.1 Hardware and measured throughput</h3>
+<table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>GPU</td><td>NVIDIA T1000 (local), via <code>tensorflow-directml</code> plugin, TensorFlow 2.10.1 (not CUDA)</td></tr>
+<tr><td>Devices detected</td><td>Two DirectML PluggableDevices (GPU:0, GPU:1)</td></tr>
+<tr><td>Forward-only throughput (<code>.evaluate()</code>)</td><td>~245 ms/step</td></tr>
+<tr><td>Real training throughput (forward+backward, measured on the in-progress run in §10)</td><td>~3.4 s/step &rarr; <b>~11.5 minutes/epoch measured</b> (201 steps/epoch)</td></tr>
+</table>
+<div class="note">The ~14x gap between forward-only and train-step throughput on this DirectML GPU is larger than the ~2x typically seen on CUDA hardware, and was not anticipated early in the project — worth stating explicitly in the report as a hardware-driven constraint on how much experimentation was feasible (see §13).</div>
+
+<h2>6. Development History: Colab Crash &rarr; Local T1000 Migration</h2>
+<p>The project originally targeted Google Colab. Training runs there repeatedly caused full process crashes (not clean Python out-of-memory exceptions) at the point training began. Root cause: 128x128x3 float32 arrays were simultaneously duplicated across original, augmented, and sample-aligned copies of both datasets, plus TensorFlow/model memory — exceeding available RAM even though the GPU (T4) itself was correctly selected and had headroom. GPU choice does not address CPU/RAM-side array duplication.</p>
+<p>The project was migrated to a local machine with an NVIDIA T1000. The memory-duplication issue did not recur locally; the alignment step (§3.4) was rewritten to avoid creating additional large NumPy copies beyond the shuffle/truncate operation already described.</p>
+
+<h2>7. Execution Environment and Repository</h2>
+<table>
+<tr><th>Item</th><th>Detail</th></tr>
+<tr><td>Working notebook</td><td><code>Code_v2.ipynb</code> (adapted from the original repository's <code>Code.ipynb</code>)</td></tr>
+<tr><td>Execution method</td><td><code>papermill Code_v2.ipynb Code_v2.ipynb --log-output --kernel python3</code>, run from a local Python virtual environment, logged to <code>execution_log.txt.out</code>/<code>.err</code></td></tr>
+<tr><td>Git repository</td><td><code>github.com/misti1203/DRIFA-Net</code> (origin remote of this working copy)</td></tr>
+<tr><td>Repository status at time of writing</td><td>Local commit <code>1a2e391</code> ("Add T1000-adapted DRIFA-Net notebook and updated status docs") created, containing <code>Code_v2.ipynb</code>, both status documents, <code>requirements.txt</code>, and a new <code>.gitignore</code> (excludes the dataset folder, virtual environment, <code>.keras</code> checkpoints, and log files from version control, as these are large binaries/generated artifacts unsuitable for git). <b>Push to the remote is currently blocked</b> — the authenticated account does not have write permission to this repository; unresolved as of this writing and needs to be fixed outside of this document's scope before the code is actually on GitHub.</td></tr>
+</table>
+
+<div class="pagebreak"></div>
+<h2>8. Evaluation Methodology</h2>
+<p>Predictions from both softmax heads are converted from one-hot/probability vectors to class labels via <code>np.argmax</code> (an earlier version of the evaluation code incorrectly used binary thresholding (<code>y_pred >= 0.5</code>), which is invalid for multiclass softmax outputs — this was identified and corrected). Metrics reported: accuracy, and macro-averaged precision/recall/F1 (macro averaging — unweighted mean across classes — is what actually exposes the HAM10000 minority-class problem in §9; accuracy alone hides it). A side-by-side confusion matrix (one per branch) was added as a dedicated notebook cell using <code>sklearn.metrics.ConfusionMatrixDisplay</code>.</p>
+<p>Note on test-set pairing: because the model has two inputs, evaluation is run with two different Brain-MRI/HAM10000 test-set pairings depending on which one is being index-aligned to the other's length (2,003-sample alignment vs. 1,600-sample original) — both pairings are present in the notebook; the headline baseline numbers in §9 come from the pairing using the original, non-duplicated 1,600-sample Brain MRI test set paired with a 1,600-sample HAM10000 subset.</p>
+
+<h2>9. Results — Stage 1: Adapted Baseline (post-training, "epoch-26" checkpoint)</h2>
+<p>Full training was run under the configuration in §5. A second, further training pass was deliberately stopped and the model was rolled back to the checkpoint saved at what the project refers to as "epoch 26" (the last <code>ModelCheckpoint</code>-saved improvement before the run was manually halted), used as the final baseline model. This baseline uses the original fixed <code>loss_weights=[0.5,0.5]</code> and no sample weighting.</p>
+<table>
+<tr><th>Branch</th><th>Accuracy</th><th>Precision (macro)</th><th>Recall (macro)</th><th>F1 (macro)</th></tr>
+<tr><td>Brain MRI (4-class)</td><td>92.375%</td><td>92.74%</td><td>92.375%</td><td>92.18%</td></tr>
+<tr><td>HAM10000 (7-class)</td><td>77.6875%</td><td>55.85%</td><td>51.39%</td><td>53.21%</td></tr>
+</table>
+<p><b>Interpretation</b>: Brain MRI is well-learned and balanced across metrics. HAM10000 shows a large gap between accuracy (77.7%) and macro recall/F1 (~51-53%) — the signature of a model that scores well by defaulting to the majority class (<code>nv</code>, 67% of the data — see §3.3) while performing poorly on minority classes. This is the finding that motivated the optimization in §10.</p>
+<div class="note">Per-epoch training-curve data for this original 26-epoch baseline run itself was not preserved in this project's logs (only the final evaluation was captured) — the report should present §9's numbers as the single final-checkpoint result, not as part of an epoch-by-epoch trajectory, unless the original training log can still be recovered from elsewhere.</div>
+
+<h2>10. Results — Stage 2: Class-Balanced Optimization (in progress)</h2>
+<h3>10.1 Motivation</h3>
+<p>Diagnosed cause of HAM10000's low macro recall/F1 (§9): severe class imbalance (§3.3), a 58:1 ratio between the largest and smallest class. The model has no incentive under plain <code>categorical_crossentropy</code> to learn the rare classes well, since predicting the majority class is already a low-loss strategy for most samples.</p>
+<h3>10.2 Method</h3>
+<p>Class-balanced per-sample weighting applied to the HAM10000 loss only (Brain MRI is already class-balanced by construction of its dataset, so it receives uniform weight 1.0 per sample). Weights computed via <code>sklearn.utils.class_weight.compute_class_weight('balanced', ...)</code>, which sets each class's weight inversely proportional to its frequency:</p>
+<pre>y_train_h_labels = np.argmax(y_train_h, axis=1)
+class_weights_ham = compute_class_weight('balanced', classes=np.arange(7), y=y_train_h_labels)
+sample_weight_ham = class_weights_ham[y_train_h_labels]
+sample_weight_brain = np.ones(len(y_train_s))
+
+model.fit(
+    x=[X_train_s, X_train_h], y=[y_train_s, y_train_h],
+    sample_weight=[sample_weight_brain, sample_weight_ham],
+    epochs=20, validation_split=0.2, shuffle=True, callbacks=callbacks
+)</pre>
+<table>
+<tr><th>Class</th><th>Computed weight</th></tr>
+<tr><td>nv</td><td>&asymp;0.21x</td></tr>
+<tr><td>mel</td><td>&asymp;1.29x</td></tr>
+<tr><td>bkl</td><td>&asymp;1.30x</td></tr>
+<tr><td>bcc</td><td>&asymp;2.78x</td></tr>
+<tr><td>akiec</td><td>&asymp;4.37x</td></tr>
+<tr><td>vasc</td><td>&asymp;10.0x</td></tr>
+<tr><td>df</td><td>&asymp;12.4x</td></tr>
+</table>
+<p>Training resumes from the existing baseline checkpoint (not from scratch) for 20 epochs, and saves to a new file (<code>best_model_class_weighted.keras</code>) so the original baseline artifact (<code>best_model_ever.keras</code>) is preserved for before/after comparison rather than overwritten.</p>
+
+<h3>10.3 Status: <span class="tag progress">IN PROGRESS — NOT YET COMPLETE</span></h3>
+<p>As of this writing, training is in epoch 4 of 20. Observed so far:</p>
+<table>
+<tr><th>Epoch</th><th>val_loss</th><th>Checkpointed?</th></tr>
+<tr><td>1</td><td>1.20016</td><td>Yes (improved from inf)</td></tr>
+<tr><td>2</td><td>0.68784</td><td>Yes (improved)</td></tr>
+<tr><td>3</td><td>(no improvement over 0.68784)</td><td>No</td></tr>
+</table>
+<p>At the measured ~11.5 min/epoch (§5.1), full completion of all 20 epochs is expected to take roughly 3.5-4 hours from the start of this run. <b>Final accuracy/precision/recall/F1 numbers for this stage are not yet available and must not be fabricated in the report</b> — re-run the evaluation cells once training finishes and insert the real numbers before submission.</p>
+<h3>10.4 Expected direction of the result (estimate, explicitly not a measured result)</h3>
+<table>
+<tr><th>Metric (HAM10000)</th><th>Baseline (§9)</th><th>Estimated range post-optimization</th></tr>
+<tr><td>Accuracy</td><td>77.7%</td><td>~68-75% (a drop is the expected, correct outcome — see rationale below)</td></tr>
+<tr><td>Macro Recall</td><td>51.4%</td><td>~60-70%</td></tr>
+<tr><td>Macro Precision</td><td>55.9%</td><td>~58-65%</td></tr>
+<tr><td>Macro F1</td><td>53.2%</td><td>~60-67%</td></tr>
+</table>
+<p><b>Why accuracy is expected to drop while recall/F1 rise</b>: the baseline's accuracy is inflated by defaulting to the majority class (<code>nv</code>). Once minority classes carry 5-12x more gradient weight, the model will start actually predicting rare classes sometimes — correctly classifying some of them (raising recall/F1) while also occasionally misclassifying borderline majority-class cases it previously got "for free" (lowering raw accuracy). This trade-off is the intended, correct behavior of class balancing for an imbalanced medical classification task, not a defect.</p>
+
+<div class="pagebreak"></div>
+<h2>11. Results — Stage 3: Architecture-Level Value Addition</h2>
+<h3>11.1 Status: <span class="tag pending">NOT YET IMPLEMENTED — DESIGN ONLY</span></h3>
+<p>This section documents a fully-scoped, not-yet-executed architectural addition, planned to be evaluated on top of the Stage 2 (class-balanced) checkpoint once it finishes training, so its own contribution can be isolated from the class-balancing gain rather than conflated with it.</p>
+
+<h3>11.2 Motivation and where it fits</h3>
+<p>As established in §4.1, the one genuinely unweighted point in the entire architecture is the final <code>Concatenate([x1, x2])</code> immediately before <code>GlobalAveragePooling2D</code> and the two classification heads — both branches enter at fixed, equal weight, with no learned adaptivity at all, unlike every earlier stage of the network (which is saturated with MFA/MIFA attention). This is the proposed insertion point.</p>
+
+<h3>11.3 Proposed module: Adaptive Fusion Gate (AFG)</h3>
+<p>For each sample, generate one scalar "branch contribution" score per branch from pooled features, normalize competitively via softmax, and use the result to reweight each branch before concatenation:</p>
+<pre>z1 = Dense(1)(Dense(16, activation='relu')(GlobalAveragePooling2D()(x1)))
+z2 = Dense(1)(Dense(16, activation='relu')(GlobalAveragePooling2D()(x2)))
+alpha, beta = softmax([z1, z2])          # alpha + beta = 1, per sample</pre>
+<p><b>Safety-constrained (zero-init residual) formulation</b> — required because the naive version above changes behavior at initialization (softmax gives alpha=beta&asymp;0.5, which <i>halves</i> both branches' feature magnitude relative to the current baseline's implicit full-weight, i.e. "1+1", concatenation — a real regression risk before any training even happens). The corrected formulation introduces one additional trainable scalar <code>scale</code>, initialized to 0:</p>
+<pre>x1' = x1 * (1 + scale * (2*alpha - 1))    # at scale=0: x1' = x1  exactly
+x2' = x2 * (1 + scale * (2*beta  - 1))    # at scale=0: x2' = x2  exactly
+Concatenate([x1', x2'])  # replaces the current Concatenate([x1, x2])</pre>
+<p>At initialization (<code>scale=0</code>), the model is provably, mathematically identical to the current baseline — this should be explicitly verified via a smoke test (feed identical input through both the original and modified model with <code>scale</code> forced to 0 and confirm outputs match to floating-point tolerance) before any training run. As training proceeds, <code>scale</code> only moves away from 0 if doing so reduces the loss.</p>
+
+<h3>11.4 Novelty assessment against the paper's existing mechanisms</h3>
+<table>
+<tr><th>Question</th><th>Answer</th></tr>
+<tr><td>Does MIFA already do this?</td><td>No. MIFA's <code>alpha1</code>/<code>alpha2</code> scale parameters (§4.1) are global, not sample-specific, and MIFA is applied 8 times deep inside the backbone, not at the final fusion point feeding the classifier heads.</td></tr>
+<tr><td>What does MIFA learn?</td><td>A shared, input-dependent spatial/channel attention map (from joint min/avg/max statistics of both branches) applied identically to both branches at 8 intermediate stages, each branch additionally scaled by its own <i>global</i> (not per-sample) learned parameter.</td></tr>
+<tr><td>What would AFG learn?</td><td>A single competitive, sample-specific scalar weighting between the two branches, applied once, at the final fusion point that currently has zero attention of any kind.</td></tr>
+<tr><td>Is the difference sufficient to call this a methodological addition?</td><td>Yes, with correct framing (§11.5) — it is additive to, not a replacement for, MIFA, and it operates on a part of the network MIFA does not touch.</td></tr>
+</table>
+
+<h3>11.5 Required honest framing / limitations for the report</h3>
+<ul>
+<li><b>Do not describe this as "the model learns which imaging modality is more reliable for the patient."</b> Brain MRI sample <i>i</i> and HAM10000 sample <i>i</i> are index-aligned only to satisfy Keras's multi-input batching (§3.4) — they are not two modalities of the same patient. Use "branch contribution" or "sample-specific feature contribution" instead of "modality reliability" throughout.</li>
+<li><b>Shared-vector trade-off</b>: the fused vector feeds <i>both</i> classification heads. If the gate learns to favor the Brain MRI branch for a given sample, it is simultaneously reducing HAM10000's share of that same forward pass, and vice versa — a structural trade-off between the two tasks that the zero-init safety design does not remove (it only guarantees a safe <i>starting point</i>, not safe <i>training dynamics</i>). Report both branches' metrics separately, not just an aggregate, since one task's metric moving up while the other moves down is a plausible, non-broken outcome.</li>
+<li><b>No guaranteed accuracy improvement.</b> The zero-init design guarantees the model cannot be worse than baseline <i>at initialization</i>; it does not guarantee the <i>trained</i> result improves on baseline. Report results as measured, hedged appropriately.</li>
+</ul>
+
+<h3>11.6 Estimated cost</h3>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Added parameters</td><td>&asymp;16,500 (GAP + Dense(16) + Dense(1) per branch, plus one scalar) vs. 53,883,843 total &mdash; &asymp;0.03% increase</td></tr>
+<tr><td>Added inference compute</td><td>Two small dense layers operating on an already-pooled 512-length vector per branch; negligible next to the convolutional backbone</td></tr>
+</table>
+
+<h3>11.7 Alternatives considered and why they were not selected</h3>
+<table>
+<tr><th>Candidate</th><th>Summary</th><th>Why not chosen</th></tr>
+<tr><td>Dynamic Weight Averaging (DWA)</td><td>Adjusts the two <i>task loss</i> weights <code>[w_brain, w_HAM]</code> per epoch based on each task's relative loss-improvement rate; naturally starts at [0.5,0.5] (identity-safe) since no history exists for the first two epochs.</td><td>Technically sound and arguably safer (zero inference-time cost, since it only affects training-time loss combination) — but it is also fundamentally a reweighting technique, the same category as the Stage 2 class-balancing fix already applied. Combining two loss-reweighting techniques risks reading as one idea done twice, rather than two distinct contributions spanning different levels of the pipeline. AFG was chosen instead specifically to diversify the overall contribution (data/loss-level fix + architecture-level fix).</td></tr>
+<tr><td>Squeeze-and-Excitation (SE) channel recalibration on the fused vector</td><td>Standard channel-attention block (Hu et al., 2018) applied to the 1024-channel fused representation.</td><td>Lower risk than AFG (no branch-competition/shared-vector trade-off), but a well-established, widely-used technique — weaker as a presentable "contribution" than a purpose-built gate, and does not address the specific "no weighting at the final fusion point" gap as directly.</td></tr>
+<tr><td>Learned attention pooling (replacing plain GlobalAveragePooling2D)</td><td>1x1 conv + softmax spatial attention over the 4x4 feature grid, weighted sum instead of uniform average.</td><td>Reasonable alternative; not pursued due to time constraints once AFG was selected as the primary candidate.</td></tr>
+</table>
+
+<div class="pagebreak"></div>
+<h2>12. Threats to Validity / Required Disclosures</h2>
+<ul>
+<li><b>Adaptation, not reproduction.</b> The original paper's protocol uses five datasets across multiple modality pairs; this project uses two (Brain Tumor MRI + HAM10000, replacing SIPaKMeD). Dataset statistics, class counts, and the interpretation of "multimodal fusion" all differ from the original protocol as a result. State this plainly rather than imply a validated reproduction of the paper's reported results.</li>
+<li><b>Unpaired dataset construction.</b> As discussed in §3.4 and §11.5, the two branches' samples are index-paired for training mechanics only, not biologically/clinically paired. Any language implying per-patient cross-modality reasoning should be avoided project-wide, not just for §11.</li>
+<li><b>Hardware-constrained experimental scope.</b> The measured ~11.5 min/epoch training throughput (§5.1, far slower than initially estimated from forward-only benchmarking) genuinely limited how many epochs and how many comparative experiments were feasible within the project's available time. This is a real, disclosed constraint, not an excuse — state it as such, and note where results would benefit from longer/larger-scale validation on stronger hardware as future work.</li>
+<li><b>Original paper's own reported metrics were not independently verified in this session</b> (§1) — the abstract does not state them; pull exact figures from the paper's results tables directly for any comparison claims in the report.</li>
+</ul>
+
+<h2>13. Suggested Report Structure</h2>
+<ol>
+<li>Introduction &amp; motivation (cite DRIFA-Net, arXiv:2412.01248; state the adaptation scope from the start)</li>
+<li>Related work (DRIFA-Net's MFA/MIFA mechanisms; briefly, class-imbalance handling literature; multi-task loss weighting literature for the DWA-vs-AFG discussion in §11.7)</li>
+<li>Datasets &amp; preprocessing (§3)</li>
+<li>Architecture (§4) — include the corrected 8x-MIFA data-flow diagram from §4.1, not a simplified one-shot-fusion diagram</li>
+<li>Experimental setup (§5, §7, §8)</li>
+<li>Results: baseline (§9) &rarr; class-balanced optimization (§10) &rarr; AFG value addition (§11), each with its own metrics table</li>
+<li>Discussion: why accuracy fell while recall/F1 rose in §10 (this is a finding worth explaining well, not hiding); AFG's shared-vector trade-off discussion from §11.5</li>
+<li>Limitations (§12)</li>
+<li>Conclusion &amp; future work (larger-scale AFG variants, DWA as a complementary future direction, GradNorm, longer training on stronger hardware)</li>
+</ol>
+<div class="note">Suggested contribution statement template (fill in only once §10 and §11 have real, measured numbers): "We adapt DRIFA-Net (Dhar et al., arXiv:2412.01248) to a Brain Tumor MRI + HAM10000 dual-branch setting, diagnose a severe class-imbalance-driven precision/recall gap in the HAM10000 branch via confusion-matrix analysis, address it with class-balanced loss weighting, and additionally propose a lightweight, safety-constrained Adaptive Fusion Gate at the network's one previously-unweighted fusion point, evaluated under a zero-initialization guarantee that it cannot regress baseline behavior at initialization."</div>
+
+</body>
+</html>
