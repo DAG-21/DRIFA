@@ -8,8 +8,10 @@ This is an **adaptation, not a reproduction** of the original paper's protocol �
 
 | File | What it is |
 |---|---|
-| `Code_v2.ipynb` | Main adapted pipeline: dataset loading, preprocessing/augmentation, model build, training, evaluation |
-| `AFG_Value_Addition.ipynb` | Adaptive Fusion Gate experiment — an architecture-level addition tested on top of the baseline (see Results below) |
+| `Code_v2.ipynb` | Main adapted pipeline: dataset loading, preprocessing/augmentation, model build, class-balanced training, evaluation, confusion matrices, and a single-image inference demo cell |
+| `AFG_Value_Addition.ipynb` | Adaptive Fusion Gate experiment — the actual training notebook. Currently incomplete (paused mid-run) due to repeated environment crashes in its own post-training evaluation cells, likely memory pressure on the local GPU — see the status guide |
+| `AFG_Eval_Only.ipynb` | Full, completed evaluation of the trained AFG checkpoint (loads the saved weights and runs the complete evaluation + confusion matrix, skipping the training step that kept crashing above) |
+| `CW_Eval_Only.ipynb` | Full, completed evaluation of the class-balanced checkpoint, including the confusion matrix |
 | `DRIFA_Project_Current_Status_and_Implementation_Guide.md` | Full engineering log: dataset substitution, architecture review, training config, hardware notes, decisions and their reasoning |
 | `doc_for_report_creation.pdf` / `.html` | Researcher-facing reference document — citation, methodology, results at each stage, honest limitations |
 | `requirements.txt` | Python dependencies |
@@ -40,7 +42,14 @@ Retained from the original repository: **MFA** (multi-branch fusion attention), 
 
 HAM10000's gap between accuracy and macro recall/F1 traces directly to the class imbalance above — the model was defaulting toward the majority class rather than learning rare classes well.
 
-**Class-balanced training** (`sklearn` balanced class weights applied to the HAM10000 loss, sqrt-dampened and combined with a lower fine-tuning learning rate for training stability): in progress — this document will be updated with final numbers once the run completes.
+**Class-balanced training** (`sklearn` balanced class weights applied to the HAM10000 loss, sqrt-dampened and combined with a lower fine-tuning learning rate for training stability — see `CW_Eval_Only.ipynb` for the full run):
+
+| Branch | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) |
+|---|---|---|---|---|
+| Brain MRI (4-class) | 92.7% | 93.0% | 92.7% | 92.5% |
+| HAM10000 (7-class) | 75.9% | 53.1% | **56.4%** | **54.6%** |
+
+Compared to baseline: Brain MRI is essentially unchanged, while HAM10000 trades a small drop in accuracy/precision (-1.8 / -2.8 points) for a real recall improvement (**+5.0 points**) and F1 improvement (**+1.4 points**) — the model now actually predicts minority classes instead of defaulting to the majority class (`nv`), which is the correct trade-off for this kind of imbalance.
 
 **Adaptive Fusion Gate (AFG)**: an architecture-level addition inserted at the one point in the network with no learned weighting today — the final feature concatenation immediately before the classification heads — designed to let the model learn a per-sample, competitive weighting between the two branches, with a zero-initialization guarantee that the model starts mathematically identical to baseline. Tested over a short training run; results did not show an improvement over baseline on either branch. Documented honestly as a negative result — see `doc_for_report_creation.pdf` for the full design, the safety argument, and analysis of why it may not have helped (most likely: too few epochs for the newly-added parameters to specialize, and the two branches being index-paired rather than genuinely paired samples, limiting how much real "branch trust" signal exists to learn from).
 
